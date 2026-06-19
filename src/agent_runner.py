@@ -62,10 +62,13 @@ SYSTEM_PROMPT = """你是一个基于「目标树」工作的规划-执行 Agent
 
 【节点完成的标准流程（本系统的核心：评价门控 + 重试/重规划 + 历史）】
 每个叶子节点都必须满足「需求」且「评价分数达标」才能关闭，否则要重做或重规划：
-  A. 设标准：先用 goal_set_criteria 给该节点补全 requirements(硬性需求) + metrics(评价指标) + pass_threshold(及格线，如0.8)。
+  A. 设标准：先用 goal_set_criteria 给该节点补全 requirements(硬性需求) + metrics(评价指标) + pass_threshold(及格线)。
      - metrics 每条含 key/name/layer(规则|常识|体验)/judge_method/pass_criteria/weight。
      - 规则层=确定性硬判定（预算/必去/忌口/无障碍/时间冲突等）；常识层=空间时间合理性等(LLM+rubric)；体验层=主题契合/吸引力(LLM+引用证据)。
-  B. 执行：完成该节点的工作（用文字产出结果）。
+     - pass_threshold 一般设 0.8（系统上限 0.85，设过高会几乎无法通过，没有意义）。
+  B. 执行并产出（重要）：完成该节点工作，并把【完整产出】落到独立评审看得到的地方——即：你的文字输出、artifacts、以及 goal_close 的 summary。
+     ⚠ 独立评审【只能看到】：本节点的文字输出 + artifacts + 你 close 时写的 summary + 用户提交；它【看不到】ui_canvas 画布和 cache 缓存文件。
+     所以：别把关键产出只丢到画布或缓存里——一定要同时在文字/artifacts/summary 里给出完整内容，否则评审会因"看不到产出"而判低分。
   C. 评估（关键：你不能自己打分）：评分一律由一个【独立评审大模型】自动完成，它与你相互独立、只看指标与产出。
      - 你【绝不要】自己给分数，也没有传分数的入口。
      - 每次 goal_close 都会【自动触发】一次独立评审来打分并决定能否关闭；你也可以在关闭前先用 goal_eval 主动触发一次评审预览。
@@ -216,19 +219,24 @@ def build_goal_server(tree: GoalTree, judge_llm: Callable, log: Callable[[str], 
     async def goal_close(args: dict) -> dict:
         nid = args.get("node_id") or tree.focused_id
         node = tree.nodes.get(nid)
+        summary = args.get("summary", "")
+        # 先把本次声明的 artifacts 并入节点，确保评审能看到（评审在 close 之前跑）
+        if node is not None and isinstance(args.get("artifacts"), dict):
+            node.artifacts.update(args["artifacts"])
         # 每次关闭都自动触发一次独立评审（叶子且已设指标时）。requires_user_input 缺失会在 close 内拦截。
         if node is not None and not node.children and node.metrics:
             if node.requires_user_input and not node.user_submitted:
                 return {"content": [{"type": "text", "text":
                     "⛔ 无法关闭：本节点要求真实用户输入，请先用 ui_render(await_result=true) 让用户提交，再关闭。"}]}
-            res = await evaluate_node(tree, nid, judge_llm, JUDGE_MODEL, log)
+            # 把 agent 声明的 summary 一并喂给独立评审作为一手证据
+            res = await evaluate_node(tree, nid, judge_llm, JUDGE_MODEL, log, summary=summary)
             if not res["passed"]:
                 return {"content": [{"type": "text", "text":
                     f"⛔ 无法关闭：独立评审未通过（overall={res['overall']} < 阈值{res['threshold']}，"
                     f"未过指标={res['failed']}）。评审意见：{res.get('notes', '')}。\n"
                     "请 goal_retry 重做本节点，或 goal_plan(replace=true) 重规划其子结构。"}]}
         try:
-            tree.close(nid, args.get("summary", ""), args.get("artifacts"))
+            tree.close(nid, summary, args.get("artifacts"))
         except ValueError as e:
             return {"content": [{"type": "text", "text": f"⛔ 无法关闭（门控）：{e}"}]}
         nxt = tree.advance_focus(nid)
@@ -296,7 +304,11 @@ def build_ui_server(bridge: UIBridge, tree: GoalTree):
         {"html": str, "url": str, "title": str},
     )
     async def ui_canvas(args: dict) -> dict:
-        bridge.canvas(html=args.get("html") or None, url=args.get("url") or None, title=args.get("title", ""))
+        html = args.get("html") or None
+        bridge.canvas(html=html, url=args.get("url") or None, title=args.get("title", ""))
+        # 把画布内容记到当前焦点节点，供独立评审作为产出证据（截断防过大）
+        if html and tree.focused_id and tree.focused_id in tree.nodes:
+            tree.nodes[tree.focused_id].artifacts["_canvas_html"] = html[:4000]
         return {"content": [{"type": "text", "text": "✅ 已更新「Agent 画布」（前端已自动刷新）。"}]}
 
     return create_sdk_mcp_server(name="ui", version="1.0.0", tools=[ui_render, ui_canvas])

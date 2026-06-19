@@ -35,16 +35,29 @@ def _parse_json(text: str) -> dict:
     return json.loads(text)
 
 
-def _node_output_text(tree, node_id: str) -> str:
+def _node_output_text(tree, node_id: str, summary: Optional[str] = None) -> str:
     n = tree.nodes[node_id]
     parts: list[str] = []
     if n.description:
         parts.append("目标说明：" + n.description)
+    # agent 在 goal_close 时声明的产出/结论（最重要的一手证据）
+    declared = summary or n.summary
+    if declared:
+        parts.append("Agent 声明的产出/结论（summary）：\n" + declared)
     texts = [e["text"] for e in n.transcript if e.get("kind") == "text"]
     if texts:
         parts.append("执行产出（agent 的文字输出）：\n" + "\n".join(texts))
-    if n.artifacts:
-        parts.append("结构化产物 artifacts：\n" + json.dumps(n.artifacts, ensure_ascii=False, indent=2))
+    # 若 transcript 被 retry 清空，则用上次归档的产出兜底
+    if not texts and n.attempts:
+        last = n.attempts[-1].get("produced")
+        if last:
+            parts.append("（上次尝试的产出，供参考）：\n" + last)
+    artifacts = {k: v for k, v in (n.artifacts or {}).items()}
+    canvas = artifacts.pop("_canvas_html", None)
+    if artifacts:
+        parts.append("结构化产物 artifacts：\n" + json.dumps(artifacts, ensure_ascii=False, indent=2))
+    if canvas:
+        parts.append("最近一次画布渲染内容（ui_canvas）：\n" + str(canvas)[:4000])
     if n.user_inputs:
         parts.append("用户真实提交：\n" + json.dumps(n.user_inputs, ensure_ascii=False, indent=2))
     return "\n\n".join(parts) or "（本节点暂无产出）"
@@ -56,8 +69,12 @@ async def evaluate_node(
     llm_call: Callable,
     model: str,
     log: Optional[Callable[[str], None]] = None,
+    summary: Optional[str] = None,
 ) -> dict:
-    """触发独立评审模型为节点打分，并把结果写回 tree.current_eval。返回门控结果。"""
+    """触发独立评审模型为节点打分，并把结果写回 tree.current_eval。返回门控结果。
+
+    summary：agent 在 goal_close 时声明的产出/结论，作为评审的一手证据一并喂入。
+    """
     n = tree.nodes[node_id]
     if not n.metrics:
         return tree.record_eval(node_id, [], 1.0, "无评价指标，跳过评审。", judged_by=f"independent:{model}")
@@ -70,8 +87,9 @@ async def evaluate_node(
         f"目标节点：{n.title}\n"
         f"硬性需求（requirements）：{json.dumps(n.requirements, ensure_ascii=False)}\n\n"
         f"评价指标（metrics，含层级/判定方式/通过标准）：\n{metrics_desc}\n\n"
-        f"待评估产出：\n{_node_output_text(tree, node_id)}\n\n"
-        f"请依据上述每条指标逐项打分，并给出加权 overall（0~1）。只输出规定的 JSON。"
+        f"待评估产出：\n{_node_output_text(tree, node_id, summary)}\n\n"
+        f"评分原则：只针对【上述产出是否满足各项指标】打分，不要因为产出文字短/格式不正式而扣分——"
+        f"只要内容能满足指标即可通过。请依据每条指标逐项打分，并给出加权 overall（0~1）。只输出规定的 JSON。"
     )
 
     try:

@@ -21,6 +21,12 @@ from typing import Any, Callable, Optional
 STATUSES = {"pending", "active", "done", "blocked", "abandoned"}
 OPEN_STATUSES = {"pending", "active", "blocked"}
 
+MAX_PASS_THRESHOLD = 0.85  # 及格线上限：防止 agent 自设过高(0.9/0.95)导致几乎不可能通过
+
+
+def _clamp_threshold(v: float) -> float:
+    return max(0.5, min(MAX_PASS_THRESHOLD, float(v)))
+
 
 @dataclass
 class GoalNode:
@@ -113,7 +119,7 @@ class GoalTree:
                 sg.get("acceptance"),
                 requirements=list(sg.get("requirements", []) or []),
                 metrics=list(sg.get("metrics", []) or []),
-                pass_threshold=float(sg.get("pass_threshold", 0.8) or 0.8),
+                pass_threshold=_clamp_threshold(sg.get("pass_threshold", 0.8) or 0.8),
             )
             self.nodes[cid] = n
             parent.children.append(cid)
@@ -163,7 +169,7 @@ class GoalTree:
         if metrics is not None:
             n.metrics = list(metrics)
         if pass_threshold is not None:
-            n.pass_threshold = float(pass_threshold)
+            n.pass_threshold = _clamp_threshold(pass_threshold)
         if requires_user_input is not None:
             n.requires_user_input = bool(requires_user_input)
         n.updated_at = time.time()
@@ -219,10 +225,12 @@ class GoalTree:
 
     def _archive_attempt(self, n: GoalNode, outcome: str, summary: str = "", reason: str = "") -> None:
         ev = n.current_eval or {}
+        produced = "\n".join(e["text"] for e in n.transcript if e.get("kind") == "text")[:2000]
         n.attempts.append(
             {
                 "n": n.attempt_no,
                 "summary": summary or ev.get("notes", ""),
+                "produced": produced,         # 保留本次尝试的产出文字，retry 清空 transcript 后仍可追溯
                 "overall": ev.get("overall"),
                 "threshold": ev.get("threshold", n.pass_threshold),
                 "passed": ev.get("passed", outcome == "passed"),
