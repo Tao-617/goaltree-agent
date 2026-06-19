@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>短途旅行需求问卷</title>
+<!--
+  树形分支需求问卷(可视化样本)
+  用法:agent 将本文件作为 iframe 插入其可视化界面。
+  用户提交后,本页通过 postMessage 向父窗口发送结构化《旅行需求表》:
+      window.parent.postMessage({ type: 'trip-req-eval:submit', payload: {...} }, '*')
+  父页面监听该消息即可拿到需求 JSON,送入规划/评估流程。
+  字段与 questionnaire.md 第 5 节的 schema 一致。
+-->
+<style>
+  :root {
+    --bg: #0d1117; --card: #161b22; --ink: #e6edf3; --muted: #8b949e;
+    --line: #21262d; --brand: #58a6ff; --brand-soft: #122033; --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.6 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    padding: 20px;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  header h1 { font-size: 20px; margin: 0 0 4px; }
+  header p { color: var(--muted); margin: 0 0 20px; font-size: 13px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 18px 20px; margin-bottom: 14px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  }
+  .card.hidden { display: none; }
+  .q-title { font-weight: 600; margin: 0 0 4px; }
+  .q-title .req { color: #f85149; font-size: 12px; margin-left: 4px; }
+  .q-title .opt { color: var(--muted); font-size: 12px; margin-left: 4px; font-weight: 400; }
+  .q-hint { color: var(--muted); font-size: 12px; margin: 0 0 12px; }
+  .opts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .opt-chip {
+    display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px;
+    font-size: 14px; background: #21262d; color: var(--ink); transition: .15s; user-select: none;
+  }
+  .opt-chip:hover { border-color: var(--brand); background: #30363d; }
+  .opt-chip input { display: none; }
+  .opt-chip.checked { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); font-weight: 500; }
+  .sub { border-left: 3px solid var(--brand); padding-left: 14px; margin-top: 14px; }
+  .sub .q-title { font-size: 14px; }
+  input[type=text] {
+    width: 100%; padding: 9px 12px; border: 1px solid var(--line);
+    border-radius: 8px; font-size: 14px; margin-top: 8px;
+    background: #0d1117; color: var(--ink);
+  }
+  input[type=text]:focus {
+    outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px rgba(88,166,255,0.15);
+  }
+  .actions { display: flex; gap: 12px; align-items: center; margin-top: 6px; }
+  button {
+    background: var(--brand); color: #0d1117; border: 0; border-radius: 10px;
+    padding: 11px 24px; font-size: 15px; font-weight: 600; cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+  }
+  button:hover { background: #79c0ff; transform: scale(1.02); }
+  button:active { transform: scale(0.98); }
+  .err { color: #f85149; font-size: 13px; display: none; }
+  .err.show { display: inline; }
+  pre {
+    background: #0d1117; color: #e6edf3; padding: 14px; border: 1px solid var(--line); border-radius: 10px;
+    font-size: 12px; overflow: auto; display: none; margin-top: 14px;
+  }
+  pre.show { display: block; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>短途旅行需求问卷</h1>
+    <p>请按实际情况勾选,带 <span style="color:#dc2626">*</span> 为必填;其余可跳过,我们会用合理默认值。</p>
+  </header>
+
+  <form id="form">
+    <!-- ============ 模块 A 行程基础 ============ -->
+    <div class="card">
+      <p class="q-title">A1. 这次出行计划几天?<span class="req">*</span></p>
+      <div class="opts" data-single data-key="duration">
+        <label class="opt-chip"><input type="radio" name="duration" value="half_day">半天</label>
+        <label class="opt-chip"><input type="radio" name="duration" value="one_day">一天</label>
+        <label class="opt-chip"><input type="radio" name="duration" value="two_days_one_night">两天一夜</label>
+        <label class="opt-chip"><input type="radio" name="duration" value="three_plus">三天及以上</label>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="q-title">A2. 和谁一起出行?<span class="req">*</span><span class="opt">可多选</span></p>
+      <div class="opts" data-key="companions">
+        <label class="opt-chip"><input type="checkbox" name="companions" value="solo">独自一人</label>
+        <label class="opt-chip"><input type="checkbox" name="companions" value="couple">情侣/伴侣</label>
+        <label class="opt-chip"><input type="checkbox" name="companions" value="friends">朋友</label>
+        <label class="opt-chip"><input type="checkbox" name="companions" value="family_kids">带儿童</label>
+        <label class="opt-chip"><input type="checkbox" name="companions" value="family_elderly">带老人</label>
+        <label class="opt-chip"><input type="checkbox" name="companions" value="pet">带宠物</label>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="q-title">A3. 人均预算档位?<span class="req">*</span></p>
+      <div class="opts" data-single data-key="budget_tier">
+        <label class="opt-chip"><input type="radio" name="budget_tier" value="economy">经济</label>
+        <label class="opt-chip"><input type="radio" name="budget_tier" value="comfort">舒适</label>
+        <label class="opt-chip"><input type="radio" name="budget_tier" value="premium">不限</label>
+      </div>
+    </div>
+
+    <!-- ============ 模块 B 儿童(A2 含 family_kids 触发)============ -->
+    <div class="card hidden" data-show-if="companions:family_kids">
+      <p class="q-title">B1. 孩子的年龄段?<span class="opt">可多选</span></p>
+      <div class="opts" data-key="kids.age_groups">
+        <label class="opt-chip"><input type="checkbox" name="kids.age_groups" value="toddler">婴幼儿(0-3)</label>
+        <label class="opt-chip"><input type="checkbox" name="kids.age_groups" value="preschool">学龄前(3-6)</label>
+        <label class="opt-chip"><input type="checkbox" name="kids.age_groups" value="school">学龄(6-12)</label>
+        <label class="opt-chip"><input type="checkbox" name="kids.age_groups" value="teen">青少年(12+)</label>
+      </div>
+      <div class="sub hidden" data-show-if="kids.age_groups:toddler|kids.age_groups:preschool">
+        <p class="q-title">B2. 是否需要以下设施?<span class="opt">可多选</span></p>
+        <div class="opts" data-key="kids.facilities">
+          <label class="opt-chip"><input type="checkbox" name="kids.facilities" value="stroller_friendly">婴儿车友好</label>
+          <label class="opt-chip"><input type="checkbox" name="kids.facilities" value="nursing_room">母婴室</label>
+          <label class="opt-chip"><input type="checkbox" name="kids.facilities" value="kid_meal">儿童餐/餐椅</label>
+        </div>
+      </div>
+      <div class="sub">
+        <p class="q-title">B3. 是否希望包含亲子/科普类活动?</p>
+        <div class="opts" data-single data-key="kids.kid_activities">
+          <label class="opt-chip"><input type="radio" name="kids.kid_activities" value="preferred">优先安排</label>
+          <label class="opt-chip"><input type="radio" name="kids.kid_activities" value="ok">顺路即可</label>
+          <label class="opt-chip"><input type="radio" name="kids.kid_activities" value="no">不需要</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 模块 C 老人(A2 含 family_elderly 触发)============ -->
+    <div class="card hidden" data-show-if="companions:family_elderly">
+      <p class="q-title">C1. 老人的步行耐受度?<span class="req">*</span></p>
+      <div class="opts" data-single data-key="elderly.walking_tolerance">
+        <label class="opt-chip"><input type="radio" name="elderly.walking_tolerance" value="high">可长时间步行</label>
+        <label class="opt-chip"><input type="radio" name="elderly.walking_tolerance" value="moderate">适度,需休息</label>
+        <label class="opt-chip"><input type="radio" name="elderly.walking_tolerance" value="low_accessible">需无障碍</label>
+      </div>
+      <div class="sub hidden" data-show-if="elderly.walking_tolerance:low_accessible">
+        <p class="q-title">C2. 是否需要无障碍通行?<span class="opt">可多选</span></p>
+        <div class="opts" data-key="elderly.accessibility">
+          <label class="opt-chip"><input type="checkbox" name="elderly.accessibility" value="wheelchair">轮椅可达</label>
+          <label class="opt-chip"><input type="checkbox" name="elderly.accessibility" value="elevator">电梯/坡道</label>
+          <label class="opt-chip"><input type="checkbox" name="elderly.accessibility" value="no_stairs">避免长楼梯</label>
+        </div>
+      </div>
+      <div class="sub">
+        <p class="q-title">C3. 是否需要避免高强度项目?<span class="opt">可多选</span></p>
+        <div class="opts" data-key="elderly.avoid">
+          <label class="opt-chip"><input type="checkbox" name="elderly.avoid" value="climbing">避免爬山/爬高</label>
+          <label class="opt-chip"><input type="checkbox" name="elderly.avoid" value="high_altitude">避免高海拔</label>
+          <label class="opt-chip"><input type="checkbox" name="elderly.avoid" value="exposure">避免暴晒/久站</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 模块 D 住宿(A1 过夜触发)============ -->
+    <div class="card hidden" data-show-if="duration:two_days_one_night|duration:three_plus">
+      <p class="q-title">D1. 住宿档位?<span class="req">*</span></p>
+      <div class="opts" data-single data-key="accommodation.tier">
+        <label class="opt-chip"><input type="radio" name="accommodation.tier" value="economy">经济</label>
+        <label class="opt-chip"><input type="radio" name="accommodation.tier" value="comfort">舒适</label>
+        <label class="opt-chip"><input type="radio" name="accommodation.tier" value="premium">品质</label>
+      </div>
+      <div class="sub">
+        <p class="q-title">D2. 住宿位置偏好?</p>
+        <div class="opts" data-single data-key="accommodation.location_pref">
+          <label class="opt-chip"><input type="radio" name="accommodation.location_pref" value="downtown">市中心</label>
+          <label class="opt-chip"><input type="radio" name="accommodation.location_pref" value="near_attraction">景区附近</label>
+          <label class="opt-chip"><input type="radio" name="accommodation.location_pref" value="near_transit">交通枢纽附近</label>
+          <label class="opt-chip"><input type="radio" name="accommodation.location_pref" value="any">无所谓</label>
+        </div>
+      </div>
+      <div class="sub">
+        <p class="q-title">D3. 房型/特殊需求?<span class="opt">可多选</span></p>
+        <div class="opts" data-key="accommodation.room_needs">
+          <label class="opt-chip"><input type="checkbox" name="accommodation.room_needs" value="big_bed">大床房</label>
+          <label class="opt-chip"><input type="checkbox" name="accommodation.room_needs" value="twin">双床房</label>
+          <label class="opt-chip"><input type="checkbox" name="accommodation.room_needs" value="family_room">家庭/亲子房</label>
+          <label class="opt-chip"><input type="checkbox" name="accommodation.room_needs" value="breakfast">含早餐</label>
+          <label class="opt-chip"><input type="checkbox" name="accommodation.room_needs" value="parking">可停车</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 模块 E 宠物(A2 含 pet 触发)============ -->
+    <div class="card hidden" data-show-if="companions:pet">
+      <p class="q-title">E1. 宠物类型与体型?<span class="req">*</span></p>
+      <div class="opts" data-single data-key="pet.size">
+        <label class="opt-chip"><input type="radio" name="pet.size" value="small">小型犬/猫</label>
+        <label class="opt-chip"><input type="radio" name="pet.size" value="large">中大型犬</label>
+        <label class="opt-chip"><input type="radio" name="pet.size" value="other">其他</label>
+      </div>
+      <div class="sub">
+        <p class="q-title">E2. 需要哪些宠物友好条件?<span class="opt">可多选</span></p>
+        <div class="opts" data-key="pet.needs">
+          <label class="opt-chip"><input type="checkbox" name="pet.needs" value="pet_hotel">宠物友好住宿</label>
+          <label class="opt-chip"><input type="checkbox" name="pet.needs" value="pet_venue">宠物可入餐厅/景区</label>
+          <label class="opt-chip"><input type="checkbox" name="pet.needs" value="self_drive">自驾携带</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 模块 F 出行与交通 ============ -->
+    <div class="card">
+      <p class="q-title">F1. 倾向的出行方式?<span class="req">*</span></p>
+      <div class="opts" data-single data-key="transport.mode">
+        <label class="opt-chip"><input type="radio" name="transport.mode" value="self_drive">自驾</label>
+        <label class="opt-chip"><input type="radio" name="transport.mode" value="public">公共交通</label>
+        <label class="opt-chip"><input type="radio" name="transport.mode" value="taxi">打车/包车</label>
+        <label class="opt-chip"><input type="radio" name="transport.mode" value="any">都可以</label>
+      </div>
+      <div class="sub">
+        <p class="q-title">F2. 单程通勤最长可接受多久?</p>
+        <div class="opts" data-single data-key="transport.max_commute">
+          <label class="opt-chip"><input type="radio" name="transport.max_commute" value="30m">≤30 分钟</label>
+          <label class="opt-chip"><input type="radio" name="transport.max_commute" value="1h">≤1 小时</label>
+          <label class="opt-chip"><input type="radio" name="transport.max_commute" value="2h">≤2 小时</label>
+          <label class="opt-chip"><input type="radio" name="transport.max_commute" value="any">不介意</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 模块 G 主题与偏好 ============ -->
+    <div class="card">
+      <p class="q-title">G1. 这次想要的体验?<span class="req">*</span><span class="opt">可多选</span></p>
+      <div class="opts" data-key="preferences.themes">
+        <label class="opt-chip"><input type="checkbox" name="preferences.themes" value="nature">自然风光</label>
+        <label class="opt-chip"><input type="checkbox" name="preferences.themes" value="culture">历史文化</label>
+        <label class="opt-chip"><input type="checkbox" name="preferences.themes" value="food">美食</label>
+        <label class="opt-chip"><input type="checkbox" name="preferences.themes" value="shopping">购物</label>
+        <label class="opt-chip"><input type="checkbox" name="preferences.themes" value="instagram">网红打卡</label>
+        <label class="opt-chip"><input type="checkbox" name="preferences.themes" value="relax">休闲放松</label>
+        <label class="opt-chip"><input type="checkbox" name="preferences.themes" value="outdoor">户外运动</label>
+        <label class="opt-chip"><input type="checkbox" name="preferences.themes" value="family">亲子</label>
+      </div>
+      <div class="sub hidden" data-show-if="preferences.themes:food">
+        <p class="q-title">G2. 饮食禁忌/偏好?<span class="opt">可多选</span></p>
+        <div class="opts" data-key="preferences.diet">
+          <label class="opt-chip"><input type="checkbox" name="preferences.diet" value="no_spicy">忌辣</label>
+          <label class="opt-chip"><input type="checkbox" name="preferences.diet" value="halal">清真</label>
+          <label class="opt-chip"><input type="checkbox" name="preferences.diet" value="vegetarian">素食</label>
+          <label class="opt-chip"><input type="checkbox" name="preferences.diet" value="seafood_allergy">海鲜过敏</label>
+        </div>
+      </div>
+      <div class="sub hidden" data-show-if="preferences.themes:outdoor">
+        <p class="q-title">G3. 户外强度偏好?</p>
+        <div class="opts" data-single data-key="preferences.outdoor_intensity">
+          <label class="opt-chip"><input type="radio" name="preferences.outdoor_intensity" value="light">轻度</label>
+          <label class="opt-chip"><input type="radio" name="preferences.outdoor_intensity" value="moderate">中度</label>
+          <label class="opt-chip"><input type="radio" name="preferences.outdoor_intensity" value="high">高强度</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="q-title">G4. 行程节奏?<span class="req">*</span></p>
+      <div class="opts" data-single data-key="preferences.pace">
+        <label class="opt-chip"><input type="radio" name="preferences.pace" value="packed">紧凑</label>
+        <label class="opt-chip"><input type="radio" name="preferences.pace" value="moderate">适中</label>
+        <label class="opt-chip"><input type="radio" name="preferences.pace" value="relaxed">悠闲</label>
+      </div>
+    </div>
+
+    <!-- ============ 模块 H 特殊约束 ============ -->
+    <div class="card">
+      <p class="q-title">H. 特殊约束<span class="opt">可跳过</span></p>
+      <p class="q-hint">天气敏感、必去地点、其他禁忌</p>
+      <div class="opts" data-key="constraints.weather_sensitivity">
+        <label class="opt-chip"><input type="checkbox" name="constraints.weather_sensitivity" value="avoid_sun">怕晒</label>
+        <label class="opt-chip"><input type="checkbox" name="constraints.weather_sensitivity" value="avoid_cold">怕冷</label>
+        <label class="opt-chip"><input type="checkbox" name="constraints.weather_sensitivity" value="rain_backup">雨天需室内备选</label>
+      </div>
+      <input type="text" id="must_visit" placeholder="必去地点(多个用逗号分隔,可留空)" />
+      <input type="text" id="notes" placeholder="其他禁忌或备注(可留空)" />
+    </div>
+
+    <div class="actions">
+      <button type="submit">生成需求表</button>
+      <span class="err" id="err">请先完成所有带 * 的必填项</span>
+    </div>
+  </form>
+
+  <pre id="out"></pre>
+</div>
+
+<script>
+(function () {
+  const form = document.getElementById('form');
+
+  // chip 选中态联动 + 触发分支刷新
+  form.addEventListener('change', refresh);
+  form.addEventListener('click', function (e) {
+    const chip = e.target.closest('.opt-chip');
+    if (chip) setTimeout(syncChips, 0);
+  });
+
+  // 单选组互斥的视觉态由 :checked 决定;这里统一刷新 checked class
+  function syncChips() {
+    form.querySelectorAll('.opt-chip').forEach(chip => {
+      const input = chip.querySelector('input');
+      chip.classList.toggle('checked', input.checked);
+    });
+  }
+
+  // 根据已选值显示/隐藏带 data-show-if 的区块
+  // 语法:"key:value" 多个用 | 分隔(任一满足即显示)
+  function refresh() {
+    syncChips();
+    const selected = collectSelectedPairs(); // Set of "name:value"
+    form.querySelectorAll('[data-show-if]').forEach(el => {
+      const conds = el.getAttribute('data-show-if').split('|');
+      const show = conds.some(c => selected.has(c.trim()));
+      el.classList.toggle('hidden', !show);
+      if (!show) clearInputs(el); // 隐藏时清空,避免脏数据
+    });
+  }
+
+  function collectSelectedPairs() {
+    const set = new Set();
+    form.querySelectorAll('input:checked').forEach(i => set.add(i.name + ':' + i.value));
+    return set;
+  }
+
+  function clearInputs(container) {
+    container.querySelectorAll('input').forEach(i => {
+      if (i.type === 'checkbox' || i.type === 'radio') i.checked = false;
+      else i.value = '';
+    });
+  }
+
+  // 把扁平的 name(支持 a.b 点路径)收集成嵌套对象
+  function buildPayload() {
+    const obj = {};
+    const set = (path, val) => {
+      const parts = path.split('.');
+      let cur = obj;
+      for (let i = 0; i < parts.length - 1; i++) cur = cur[parts[i]] = cur[parts[i]] || {};
+      cur[parts[parts.length - 1]] = val;
+    };
+    // 多选 key 需收集成数组
+    const multi = {};
+    form.querySelectorAll('input:checked').forEach(i => {
+      const isMulti = i.type === 'checkbox';
+      if (isMulti) (multi[i.name] = multi[i.name] || []).push(i.value);
+      else set(i.name, i.value);
+    });
+    Object.entries(multi).forEach(([k, v]) => set(k, v));
+
+    // 派生与自由文本
+    const dur = obj.basics_dummy; // noop
+    set('basics.duration', obj.duration || null);
+    set('basics.companions', obj.companions || []);
+    set('basics.budget_tier', obj.budget_tier || null);
+    set('basics.overnight', ['two_days_one_night', 'three_plus'].includes(obj.duration));
+    delete obj.duration; delete obj.companions; delete obj.budget_tier;
+
+    const mv = document.getElementById('must_visit').value.trim();
+    set('constraints.must_visit', mv ? mv.split(/[,，]/).map(s => s.trim()).filter(Boolean) : []);
+    set('constraints.notes', document.getElementById('notes').value.trim());
+
+    // 未触发的条件模块置 null,保持 schema 稳定
+    if (!(obj.basics.companions || []).includes('family_kids')) obj.kids = null;
+    if (!(obj.basics.companions || []).includes('family_elderly')) obj.elderly = null;
+    if (!(obj.basics.companions || []).includes('pet')) obj.pet = null;
+    if (!obj.basics.overnight) obj.accommodation = null;
+    return obj;
+  }
+
+  function validate() {
+    const required = ['duration', 'budget_tier', 'transport.mode', 'preferences.pace'];
+    for (const r of required) {
+      if (!form.querySelector(`[name="${r}"]:checked`)) return false;
+    }
+    if (!form.querySelector('[name="companions"]:checked')) return false;
+    if (!form.querySelector('[name="preferences.themes"]:checked')) return false;
+    return true;
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    const err = document.getElementById('err');
+    if (!validate()) { err.classList.add('show'); return; }
+    err.classList.remove('show');
+
+    const payload = buildPayload();
+    const out = document.getElementById('out');
+    out.textContent = JSON.stringify(payload, null, 2);
+    out.classList.add('show');
+
+    // 关键:把结果传给父窗口(agent 的可视化界面)
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'trip-req-eval:submit', payload }, '*');
+    }
+  });
+
+  refresh();
+})();
+</script>
+</body>
+</html>

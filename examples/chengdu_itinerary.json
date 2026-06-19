@@ -1,0 +1,334 @@
+{
+  "trip_overview": {
+    "destination": "成都",
+    "duration": "3天2夜",
+    "party_size": 2,
+    "budget_tier": "中等",
+    "total_budget_estimate": "4200-4800元（2人）"
+  },
+  "daily_itinerary": [
+    {
+      "day": 1,
+      "date": "Day 1",
+      "theme": "市中心人文探索 + 成都火锅",
+      "items": [
+        {
+          "time": "09:00-11:30",
+          "type": "景点",
+          "name": "武侯祠",
+          "description": "三国文化圣地，了解诸葛亮与刘备的历史，游览红墙竹影",
+          "duration": "2-2.5小时",
+          "tags": ["culture_history", "no_climbing"],
+          "cost_per_person": 50,
+          "cost_total": 100,
+          "cost_note": "门票50元/人",
+          "transport_from_hotel": "地铁/公交，约20-30分钟",
+          "commute_time": 30
+        },
+        {
+          "time": "11:30-13:30",
+          "type": "餐饮",
+          "name": "锦里小吃街",
+          "description": "紧邻武侯祠，品尝三大炮、叶儿粑、糖油果子、伤心凉粉等成都特色小吃",
+          "cuisine": "成都小吃",
+          "tags": ["food", "local_snacks"],
+          "cost_per_person": 80,
+          "cost_total": 160,
+          "cost_note": "午餐+小吃体验",
+          "transport_from_prev": "步行",
+          "commute_time": 2
+        },
+        {
+          "time": "13:30-14:00",
+          "type": "交通",
+          "name": "前往宽窄巷子",
+          "transport_mode": "地铁/打车",
+          "commute_time": 25,
+          "cost_total": 20,
+          "cost_note": "打车约15-20元"
+        },
+        {
+          "time": "14:00-17:30",
+          "type": "景点",
+          "name": "宽窄巷子",
+          "description": "成都市井文化代表，漫步清代古街，体验老成都慢生活，拍照打卡",
+          "duration": "3-3.5小时",
+          "tags": ["culture_history", "photography", "no_climbing"],
+          "cost_per_person": 0,
+          "cost_total": 0,
+          "cost_note": "免费开放，饮品/小吃另计约50元/人",
+          "optional_cost": 100
+        },
+        {
+          "time": "17:30-18:00",
+          "type": "交通",
+          "name": "前往火锅店",
+          "transport_mode": "步行/打车",
+          "commute_time": 15,
+          "cost_total": 15,
+          "cost_note": "就近选择"
+        },
+        {
+          "time": "18:00-20:00",
+          "type": "餐饮",
+          "name": "成都火锅（推荐：蜀大侠/小龙坎/大龙燚）",
+          "description": "经典成都火锅体验，牛油锅底配毛肚、黄喉、鹅肠等",
+          "cuisine": "火锅",
+          "tags": ["food", "signature_dish"],
+          "cost_per_person": 150,
+          "cost_total": 300,
+          "cost_note": "人均120-180元"
+        },
+        {
+          "time": "20:00-20:30",
+          "type": "交通",
+          "name": "返回酒店",
+          "transport_mode": "打车/地铁",
+          "commute_time": 25,
+          "cost_total": 25
+        }
+      ],
+      "day_summary": {
+        "attractions": 2,
+        "meals": 2,
+        "total_time": "约11.5小时",
+        "total_cost": 720,
+        "optional_cost": 100,
+        "cost_range": "720-820元（2人）"
+      }
+    },
+    {
+      "day": 2,
+      "date": "Day 2",
+      "theme": "文化深度游 + 禅意体验 + 串串",
+      "items": [
+        {
+          "time": "09:00-09:30",
+          "type": "交通",
+          "name": "前往杜甫草堂",
+          "transport_mode": "地铁/公交",
+          "commute_time": 30,
+          "cost_total": 12,
+          "cost_note": "公交/地铁"
+        },
+        {
+          "time": "09:30-12:00",
+          "type": "景点",
+          "name": "杜甫草堂",
+          "description": "诗圣杜甫流寓成都的故居，园林清幽，文化底蕴深厚",
+          "duration": "2-2.5小时",
+          "tags": ["culture_history", "garden", "no_climbing"],
+          "cost_per_person": 50,
+          "cost_total": 100,
+          "cost_note": "门票50元/人"
+        },
+        {
+          "time": "12:00-13:30",
+          "type": "餐饮",
+          "name": "川菜馆（推荐：陈麻婆豆腐/廖老妈蹄花）",
+          "description": "品尝正宗川菜：麻婆豆腐、回锅肉、宫保鸡丁、蹄花汤等",
+          "cuisine": "川菜",
+          "tags": ["food", "local_cuisine"],
+          "cost_per_person": 100,
+          "cost_total": 200,
+          "cost_note": "人均80-120元"
+        },
+        {
+          "time": "13:30-14:15",
+          "type": "交通",
+          "name": "前往文殊院",
+          "transport_mode": "地铁/打车",
+          "commute_time": 35,
+          "cost_total": 25,
+          "cost_note": "打车约20-30元"
+        },
+        {
+          "time": "14:15-16:30",
+          "type": "景点",
+          "name": "文殊院",
+          "description": "著名佛教寺院，体验禅意氛围，欣赏古建筑，品茶休息",
+          "duration": "2-2.5小时",
+          "tags": ["culture_history", "temple", "no_climbing"],
+          "cost_per_person": 0,
+          "cost_total": 0,
+          "cost_note": "免费开放，院内茶馆品茶约50元/人",
+          "optional_cost": 100
+        },
+        {
+          "time": "16:30-17:30",
+          "type": "餐饮",
+          "name": "文殊院小吃街",
+          "description": "洞子口张老二凉粉、甜水面等特色小吃",
+          "cuisine": "成都小吃",
+          "tags": ["food", "local_snacks"],
+          "cost_per_person": 40,
+          "cost_total": 80,
+          "cost_note": "下午茶/小吃"
+        },
+        {
+          "time": "17:30-18:00",
+          "type": "休息",
+          "name": "返回酒店休息",
+          "transport_mode": "地铁/打车",
+          "commute_time": 30,
+          "cost_total": 20
+        },
+        {
+          "time": "18:30-20:30",
+          "type": "餐饮",
+          "name": "成都串串（推荐：冒椒火辣/马路边边/屋头串串）",
+          "description": "成都特色串串香，比火锅更接地气的美食体验",
+          "cuisine": "串串香",
+          "tags": ["food", "signature_dish"],
+          "cost_per_person": 120,
+          "cost_total": 240,
+          "cost_note": "人均100-150元"
+        },
+        {
+          "time": "20:30-21:00",
+          "type": "交通",
+          "name": "返回酒店",
+          "transport_mode": "打车",
+          "commute_time": 20,
+          "cost_total": 20
+        }
+      ],
+      "day_summary": {
+        "attractions": 2,
+        "meals": 3,
+        "total_time": "约12小时",
+        "total_cost": 697,
+        "optional_cost": 100,
+        "cost_range": "697-797元（2人）"
+      }
+    },
+    {
+      "day": 3,
+      "date": "Day 3",
+      "theme": "休闲体验 + 市区打卡 + 返程",
+      "items": [
+        {
+          "time": "09:00-09:20",
+          "type": "交通",
+          "name": "前往人民公园",
+          "transport_mode": "地铁/公交",
+          "commute_time": 20,
+          "cost_total": 10
+        },
+        {
+          "time": "09:20-11:30",
+          "type": "景点",
+          "name": "人民公园 + 鹤鸣茶馆",
+          "description": "体验成都慢生活，在百年茶馆喝盖碗茶，看老成都人打麻将、掏耳朵",
+          "duration": "2-2.5小时",
+          "tags": ["culture_experience", "leisure", "no_climbing"],
+          "cost_per_person": 30,
+          "cost_total": 60,
+          "cost_note": "茶水+掏耳朵体验约30元/人"
+        },
+        {
+          "time": "11:30-13:00",
+          "type": "餐饮",
+          "name": "成都小吃（推荐：龙抄手/钟水饺/韩包子）",
+          "description": "品尝经典成都小吃：抄手、水饺、担担面等",
+          "cuisine": "成都小吃",
+          "tags": ["food", "local_snacks"],
+          "cost_per_person": 60,
+          "cost_total": 120,
+          "cost_note": "人均50-70元"
+        },
+        {
+          "time": "13:00-13:20",
+          "type": "交通",
+          "name": "前往春熙路/太古里",
+          "transport_mode": "地铁",
+          "commute_time": 15,
+          "cost_total": 8
+        },
+        {
+          "time": "13:20-16:30",
+          "type": "景点",
+          "name": "春熙路 + 太古里",
+          "description": "成都最繁华商圈，现代与传统结合，购物、拍照、打卡大熊猫雕塑",
+          "duration": "3小时",
+          "tags": ["shopping", "photography", "no_climbing"],
+          "cost_per_person": 0,
+          "cost_total": 0,
+          "cost_note": "免费，购物/饮品另计",
+          "optional_cost": 300
+        },
+        {
+          "time": "16:30-17:00",
+          "type": "休息",
+          "name": "返回酒店取行李",
+          "transport_mode": "地铁/打车",
+          "commute_time": 25,
+          "cost_total": 20
+        },
+        {
+          "time": "17:30-19:00",
+          "type": "餐饮",
+          "name": "告别晚餐（川菜或火锅）",
+          "description": "最后一餐，可选择火锅或川菜作为完美收尾",
+          "cuisine": "川菜/火锅",
+          "tags": ["food"],
+          "cost_per_person": 120,
+          "cost_total": 240,
+          "cost_note": "人均100-150元"
+        },
+        {
+          "time": "19:00之后",
+          "type": "交通",
+          "name": "前往机场/火车站",
+          "transport_mode": "地铁/机场大巴/打车",
+          "cost_total": 80,
+          "cost_note": "预留机场交通费，地铁约20元，打车约60-80元"
+        }
+      ],
+      "day_summary": {
+        "attractions": 2,
+        "meals": 2,
+        "total_time": "约10小时（返程前）",
+        "total_cost": 538,
+        "optional_cost": 300,
+        "cost_range": "538-838元（2人）"
+      }
+    }
+  ],
+  "accommodation": {
+    "nights": 2,
+    "location": "市中心（春熙路/天府广场附近）",
+    "tier": "中档酒店",
+    "cost_per_night": 350,
+    "cost_total": 700,
+    "cost_note": "中档酒店约300-400元/晚，推荐区域：春熙路、天府广场、宽窄巷子附近"
+  },
+  "budget_summary": {
+    "day1_cost": 720,
+    "day1_optional": 100,
+    "day2_cost": 697,
+    "day2_optional": 100,
+    "day3_cost": 538,
+    "day3_optional": 300,
+    "accommodation_cost": 700,
+    "subtotal_basic": 2655,
+    "subtotal_with_optional": 3155,
+    "daily_transport_reserve": 100,
+    "contingency": 200,
+    "total_budget_low": 2955,
+    "total_budget_high": 3455,
+    "per_person_low": 1478,
+    "per_person_high": 1728,
+    "budget_tier": "中等",
+    "budget_compliance": "符合中等档位（1500-2500元/人）"
+  },
+  "compliance_check": {
+    "avoid_climbing": "✓ 所有景点均为平地/园林/街区/寺庙，无爬山活动",
+    "commute_time": "✓ 所有景点间通勤时间均 ≤ 35分钟（< 1小时）",
+    "theme_culture": "✓ 每天至少1个人文景点（武侯祠、杜甫草堂、文殊院、宽窄巷子、人民公园）",
+    "theme_food": "✓ 每天至少1次特色美食体验（火锅、串串、川菜、小吃）",
+    "pace": "✓ 每天2-3个主要景点，保留充足用餐和休息时间，节奏适中",
+    "budget": "✓ 总预算2955-3455元（2人），人均1478-1728元，在中等档位内",
+    "time_consistency": "✓ 时间段连续、无冲突、无倒流"
+  }
+}

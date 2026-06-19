@@ -1,0 +1,110 @@
+{
+  "_meta": {
+    "purpose": "需求→评价指标 映射库。本文件是该技能的持久存储,由 agent 在每次评估后按 SKILL.md 第 4 节规则读取与更新。",
+    "schema_ref": "questionnaire.md 第 5 节(需求表字段)",
+    "version": 1,
+    "last_calibrated": null
+  },
+  "mappings": [
+    {
+      "requirement_key": "basics.budget_tier / 总预算",
+      "metric": "总花费不超预算上限",
+      "layer": "rule",
+      "type": "hard",
+      "judge_method": "程序化",
+      "pass_criteria": "sum(itinerary[].cost) <= budget_cap[budget_tier]",
+      "evidence": "itinerary[].cost",
+      "notes": "档位→上限阈值由实践校准;缺价时按档位均值估并标记低置信"
+    },
+    {
+      "requirement_key": "constraints.must_visit",
+      "metric": "必去清单命中率",
+      "layer": "rule",
+      "type": "hard",
+      "judge_method": "程序化",
+      "pass_criteria": "must_visit 全部出现在行程中 = 通过",
+      "evidence": "itinerary[].place",
+      "notes": "最高优先级,未命中直接判不通过"
+    },
+    {
+      "requirement_key": "preferences.diet (任一禁忌)",
+      "metric": "餐饮禁忌规避率",
+      "layer": "rule",
+      "type": "hard_filter",
+      "judge_method": "程序化",
+      "pass_criteria": "无任一餐饮项违反 diet 禁忌 = 通过",
+      "evidence": "itinerary[].meals[].cuisine/tags",
+      "notes": "已泛化:忌辣/清真/素食/海鲜过敏共用一条;标签模糊时保守判不通过"
+    },
+    {
+      "requirement_key": "elderly.accessibility",
+      "metric": "无障碍可达率",
+      "layer": "rule",
+      "type": "hard_filter",
+      "judge_method": "程序化",
+      "pass_criteria": "所有地点满足所选无障碍条件 = 通过",
+      "evidence": "itinerary[].place.accessibility",
+      "notes": "与 [[elderly.avoid 指标]] 关联"
+    },
+    {
+      "requirement_key": "elderly.avoid / constraints.weather_sensitivity",
+      "metric": "禁项规避(爬山/高海拔/暴晒等)",
+      "layer": "rule",
+      "type": "hard_filter",
+      "judge_method": "程序化",
+      "pass_criteria": "无项目命中 avoid/weather 禁项 = 通过",
+      "evidence": "itinerary[].activity.tags",
+      "notes": "天气敏感的雨天备选属软,单列"
+    },
+    {
+      "requirement_key": "transport.max_commute",
+      "metric": "单程通勤未超上限",
+      "layer": "rule",
+      "type": "hard",
+      "judge_method": "程序化",
+      "pass_criteria": "相邻行程通勤估时 <= max_commute = 通过",
+      "evidence": "itinerary 相邻项的通勤估时",
+      "notes": "无外部信息时用 agent 自估,要求前后一致"
+    },
+    {
+      "requirement_key": "(内生)时间/预算自洽",
+      "metric": "内部一致性(无时间冲突、预算可加总)",
+      "layer": "rule",
+      "type": "hard",
+      "judge_method": "程序化",
+      "pass_criteria": "时段不重叠、不倒流;各项花费之和可加总且≤声明预算",
+      "evidence": "itinerary[].time_slot / cost",
+      "notes": "无外部信息时的核心客观指标;不依赖任何用户需求字段,始终启用"
+    },
+    {
+      "requirement_key": "preferences.pace",
+      "metric": "节奏契合度",
+      "layer": "commonsense",
+      "type": "soft",
+      "judge_method": "LLM+rubric",
+      "pass_criteria": "日均景点数与留白符合 pace 档位,1-5 分",
+      "evidence": "每日行程项数与时间留白",
+      "notes": "rubric:紧凑↑密度、悠闲↑留白;过满或过空扣分"
+    },
+    {
+      "requirement_key": "preferences.themes",
+      "metric": "主题契合/覆盖率",
+      "layer": "experience",
+      "type": "soft",
+      "judge_method": "LLM+rubric",
+      "pass_criteria": "所选主题被行程体现的比例与质量,1-5 分",
+      "evidence": "itinerary[].place/activity 与 themes 的相关性",
+      "notes": "需引用具体行程项支持评分;独立调用避免自夸"
+    },
+    {
+      "requirement_key": "kids.facilities",
+      "metric": "亲子设施满足率",
+      "layer": "rule",
+      "type": "hard_filter",
+      "judge_method": "程序化",
+      "pass_criteria": "含婴幼儿时,主要地点满足所选设施 = 通过",
+      "evidence": "itinerary[].place.facilities",
+      "notes": "仅 0-6 岁触发"
+    }
+  ]
+}

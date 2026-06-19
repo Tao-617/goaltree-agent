@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="基于目标树规划-执行架构的智能旅行规划 Agent 可视化与人机协作控制台。" />
+<title>目标树 Agent · 实时可视化</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0f17; --panel: rgba(22, 27, 34, 0.7); --border: rgba(33, 38, 45, 0.6); --muted: #8b949e;
+    --text: #e6edf3; --accent: #58a6ff; --green: #3fb950; --orange: #d29922;
+    --gray: #6e7681; --red: #f85149; --purple: #bc8cff;
+    --panel-solid: #161b22;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: 'Outfit', -apple-system, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+    background: radial-gradient(circle at 50% 0%, #1c2333 0%, #0d1117 100%);
+    color: var(--text); height: 100vh; display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Webkit custom scrollbars */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+  header {
+    padding: 14px 24px; border-bottom: 1px solid var(--border);
+    background: rgba(22, 27, 34, 0.85); backdrop-filter: blur(12px);
+    display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2); z-index: 10;
+  }
+  header h1 { font-size: 18px; margin: 0; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px; }
+  header h1 .dot {
+    color: var(--accent);
+    text-shadow: 0 0 10px rgba(88, 166, 255, 0.6);
+  }
+  #req {
+    flex: 1; min-width: 280px; padding: 10px 16px; border-radius: 10px;
+    border: 1px solid var(--border); background: rgba(13, 17, 23, 0.8);
+    color: var(--text); font-size: 13px; outline: none; transition: all 0.3s;
+    font-family: inherit;
+  }
+  #req:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.2);
+    background: rgba(13, 17, 23, 0.95);
+  }
+  button {
+    padding: 10px 24px; border-radius: 10px; border: none;
+    background: linear-gradient(135deg, #58a6ff 0%, #1f6feb 100%);
+    color: #ffffff; font-weight: 600; cursor: pointer; font-size: 13px;
+    transition: all 0.2s ease; font-family: inherit;
+    box-shadow: 0 4px 12px rgba(88, 166, 255, 0.3);
+  }
+  button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(88, 166, 255, 0.5);
+    filter: brightness(1.1);
+  }
+  button:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+
+  .pill {
+    font-size: 12px; padding: 4px 12px; border-radius: 20px;
+    border: 1px solid var(--border); color: var(--muted);
+    font-weight: 500; display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.03);
+  }
+  .pill.running {
+    color: var(--green); border-color: rgba(63, 185, 80, 0.4);
+    background: rgba(63, 185, 80, 0.06);
+    box-shadow: 0 0 10px rgba(63, 185, 80, 0.15);
+  }
+  .pill.running::before {
+    content: ""; display: inline-block; width: 6px; height: 6px;
+    border-radius: 50%; background: var(--green);
+    animation: blink 1.2s infinite;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+  }
+
+  main { flex: 1; display: grid; grid-template-columns: 1fr 1.15fr 0.95fr; gap: 0; overflow: hidden; }
+  .col { overflow: auto; padding: 20px; background: rgba(22, 27, 34, 0.2); backdrop-filter: blur(8px); }
+  .col.tree { border-right: 1px solid var(--border); }
+  
+  /* Canvas (interactive center column) */
+  .col.canvas { display: flex; flex-direction: column; border-right: 1px solid var(--border); overflow: hidden; padding: 20px; }
+  .col.canvas h2 { display: flex; align-items: center; gap: 10px; }
+  .col.canvas .stamp { margin-left: auto; font-size: 11px; color: var(--muted); text-transform: none; letter-spacing: 0; font-weight: 400; }
+  #canvas-frame { flex: 1; width: 100%; border: 1px solid var(--border); border-radius: 12px; background: #0d1117;
+    min-height: 240px; transition: all .3s; box-shadow: inset 0 4px 20px rgba(0,0,0,0.3); }
+  #canvas-frame.pulse { outline: 2px solid var(--accent); box-shadow: 0 0 20px rgba(88,166,255,0.25); }
+  .col h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted);
+    margin: 0 0 16px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .col h2 .sub { color: var(--accent); text-transform: none; letter-spacing: 0; margin-left: 6px; font-weight: 500; }
+
+  /* Canvas Status Badge */
+  .status-badge {
+    font-size: 10.5px; padding: 2px 10px; border-radius: 20px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;
+    margin-left: 4px;
+  }
+  .status-badge.idle { background: rgba(110, 118, 129, 0.15); color: var(--muted); border: 1px solid rgba(110, 118, 129, 0.2); }
+  .status-badge.thinking { background: rgba(88, 166, 255, 0.15); color: var(--accent); border: 1px solid rgba(88, 166, 255, 0.3); animation: breath 2s infinite ease-in-out; }
+  .status-badge.executing { background: rgba(188, 140, 255, 0.15); color: var(--purple); border: 1px solid rgba(188, 140, 255, 0.3); animation: breath 2s infinite ease-in-out; }
+  .status-badge.interacting { background: rgba(210, 153, 34, 0.15); color: var(--orange); border: 1px solid rgba(210, 153, 34, 0.3); animation: pulse-orange 1.5s infinite ease-in-out; }
+  .status-badge.completed { background: rgba(63, 185, 80, 0.15); color: var(--green); border: 1px solid rgba(63, 185, 80, 0.3); }
+
+  @keyframes breath {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; filter: brightness(1.2); }
+  }
+  @keyframes pulse-orange {
+    0% { box-shadow: 0 0 0 0 rgba(210, 153, 34, 0.4); opacity: 0.8; }
+    70% { box-shadow: 0 0 0 6px rgba(210, 153, 34, 0); opacity: 1; }
+    100% { box-shadow: 0 0 0 0 rgba(210, 153, 34, 0); opacity: 0.8; }
+  }
+
+  .right { padding: 0; display: flex; flex-direction: column; overflow: hidden; background: rgba(22, 27, 34, 0.1); }
+  .right .box { padding: 18px 20px; overflow: auto; background: rgba(22, 27, 34, 0.3); backdrop-filter: blur(8px); }
+  .right .detail-box { flex: 0 0 46%; border-bottom: 1px solid var(--border); }
+  .right .feed-box { flex: 1; }
+
+  /* tree nodes */
+  .node { margin: 6px 0; }
+  .node-row {
+    display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; border-radius: 10px;
+    border: 1px solid var(--border); background: rgba(22, 27, 34, 0.6); transition: all 0.25s ease;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+  .node-row:hover {
+    border-color: rgba(88, 166, 255, 0.4); background: rgba(22, 27, 34, 0.85);
+    transform: translateX(2px);
+  }
+  .node-row .id { color: var(--muted); font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; min-width: 34px; font-weight: 500; }
+  .node-row .title { flex: 1; font-weight: 500; font-size: 13.5px; }
+  .node-row .badge { font-size: 11px; color: var(--muted); border: 1px solid var(--border);
+    padding: 2px 8px; border-radius: 12px; white-space: nowrap; font-weight: 500; background: rgba(255,255,255,0.02); }
+  .node-row { cursor: pointer; }
+  .node-row.sel { border-color: var(--purple); box-shadow: 0 0 0 1px var(--purple), 0 4px 12px rgba(188,140,255,0.15); }
+  .node-row .summary { color: var(--muted); font-size: 12px; margin-top: 5px; line-height: 1.5; }
+  .node-row .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .chip { font-size: 10px; padding: 2px 8px; border-radius: 12px; border: 1px solid var(--border); color: var(--muted); font-weight: 500; }
+  .chip.pass { color: var(--green); border-color: rgba(63, 185, 80, 0.4); background: rgba(63, 185, 80, 0.04); }
+  .chip.fail { color: var(--red); border-color: rgba(248, 81, 73, 0.4); background: rgba(248, 81, 73, 0.04); }
+  .chip.try { color: var(--orange); border-color: rgba(210, 153, 34, 0.4); background: rgba(210, 153, 34, 0.04); }
+  .chip.metric { color: var(--purple); border-color: rgba(188, 140, 255, 0.4); background: rgba(188, 140, 255, 0.04); }
+  .children { margin-left: 20px; border-left: 1px dashed var(--border); padding-left: 14px; margin-top: 4px; }
+
+  /* detail + history */
+  .d-title { font-weight: 600; margin-bottom: 12px; font-size: 15px; color: #fff; }
+  .d-sec { margin: 16px 0; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .d-sec h3 { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 0 0 10px; font-weight: 600; }
+  .req-li { font-size: 12.5px; color: var(--text); padding: 4px 0; line-height: 1.5; }
+  table.metrics { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+  table.metrics th, table.metrics td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.metrics th { color: var(--muted); font-weight: 600; background: rgba(0,0,0,0.1); }
+  .layer { font-size: 10px; padding: 1px 6px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.03); }
+  .verdict.pass { color: var(--green); font-weight: 600; } .verdict.fail { color: var(--red); font-weight: 600; }
+  .timeline { display: flex; flex-direction: column; gap: 8px; }
+  .att { display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; border-radius: 8px;
+    border: 1px solid var(--border); border-left-width: 4px; background: rgba(13, 17, 23, 0.4); }
+  .att.passed { border-left-color: var(--green); background: rgba(63, 185, 80, 0.02); }
+  .att.failed { border-left-color: var(--red); background: rgba(248, 81, 73, 0.02); }
+  .att.replanned { border-left-color: var(--orange); background: rgba(210, 153, 34, 0.02); }
+  .att.current { border-left-color: var(--accent); border-style: dashed; background: rgba(88, 166, 255, 0.02); }
+  .att .n { font-family: 'JetBrains Mono', ui-monospace, monospace; color: var(--muted); font-size: 12px; font-weight: 600; }
+  .att .body { flex: 1; font-size: 12.5px; }
+  .att .score { font-weight: 700; }
+  .att .score.pass { color: var(--green); } .att .score.fail { color: var(--red); }
+  .att .reason { color: var(--muted); font-size: 11.5px; margin-top: 4px; line-height: 1.4; }
+
+  .st-pending  .node-row { opacity: .65; }
+  .st-pending  .dotmark { color: var(--gray); }
+  .st-active   .node-row {
+    border-color: var(--accent);
+    background: rgba(88, 166, 255, 0.08);
+    animation: activePulse 2s infinite ease-in-out;
+  }
+  @keyframes activePulse {
+    0% { box-shadow: 0 0 0 0 rgba(88, 166, 255, 0.2), 0 2px 6px rgba(0,0,0,0.15); border-color: rgba(88, 166, 255, 0.5); }
+    50% { box-shadow: 0 0 12px 3px rgba(88, 166, 255, 0.4), 0 2px 6px rgba(0,0,0,0.15); border-color: #58a6ff; }
+    100% { box-shadow: 0 0 0 0 rgba(88, 166, 255, 0.2), 0 2px 6px rgba(0,0,0,0.15); border-color: rgba(88, 166, 255, 0.5); }
+  }
+  .st-active   .dotmark { color: var(--accent); text-shadow: 0 0 8px rgba(88, 166, 255, 0.6); }
+  .st-done     .dotmark { color: var(--green); }
+  .st-done     .title { color: var(--muted); }
+  .st-blocked  .node-row { border-color: var(--orange); background: rgba(210, 153, 34, 0.03); }
+  .st-blocked  .dotmark { color: var(--orange); }
+  .st-abandoned .node-row { opacity: .4; }
+  .st-abandoned .title { text-decoration: line-through; }
+  .focus-tag { font-size: 10px; color: var(--accent); border: 1px solid rgba(88,166,255,0.4); border-radius: 10px; padding: 1px 6px; font-weight: 600; background: rgba(88,166,255,0.06); }
+
+  /* activity feed */
+  .feed { display: flex; flex-direction: column; gap: 8px; }
+  .ev { padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); background: rgba(22, 27, 34, 0.4); font-size: 13px; line-height: 1.5; transition: transform 0.2s; }
+  .ev:hover { transform: translateX(2px); background: rgba(22, 27, 34, 0.6); }
+  .ev .meta { font-size: 11px; color: var(--muted); margin-bottom: 4px; display: flex; gap: 8px; align-items: center; }
+  .ev .nid { font-family: 'JetBrains Mono', ui-monospace, monospace; color: var(--accent); font-weight: 600; }
+  .ev.tool { border-left: 3px solid var(--purple); background: rgba(188, 140, 255, 0.02); }
+  .ev.tool .text { color: var(--purple); font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; }
+  .ev.text { border-left: 3px solid var(--accent); background: rgba(88, 166, 255, 0.02); }
+  .ev.log  { border-left: 3px solid var(--gray); color: var(--muted); font-size: 12px; background: rgba(255,255,255,0.01); }
+  .ev.text .text { white-space: pre-wrap; }
+  .empty { color: var(--muted); font-size: 13px; padding: 30px; text-align: center; line-height: 1.6; }
+  .samples { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; justify-content: center; }
+  .samples a { font-size: 12.5px; color: var(--accent); cursor: pointer; text-decoration: none; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); background: rgba(88,166,255,0.03); transition: all 0.2s; }
+  .samples a:hover { background: rgba(88,166,255,0.1); border-color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="dot">◆</span> 目标树 Agent</h1>
+  <input id="req" placeholder="输入需求，例如：帮我规划去成都 3 天 2 夜，2 人，预算中等，喜欢人文和美食，不爱爬山" />
+  <button id="run">运行</button>
+  <span id="status" class="pill">空闲</span>
+</header>
+<main>
+  <div class="col tree">
+    <h2>目标树 (Goal Tree)</h2>
+    <div id="tree"><div class="empty">尚未开始。输入需求并点击「运行」。</div>
+      <div class="samples">
+        <a data-s="帮我规划去成都 3 天 2 夜，2 人，预算中等，喜欢人文和美食，不爱爬山。">▸ 成都美食人文 3 天</a>
+        <a data-s="规划一次杭州周末 2 天 1 夜短途游，情侣出行，偏好自然风光 and 咖啡馆，节奏轻松。">▸ 杭州周末 2 天</a>
+      </div>
+    </div>
+  </div>
+  <div class="col canvas">
+    <h2>
+      <span style="display: flex; align-items: center; gap: 6px;">
+        Agent 控制台 / 画布
+        <span id="canvas-status" class="status-badge idle">已就绪</span>
+      </span>
+      <span class="sub" id="canvas-title"></span>
+      <span class="stamp" id="canvas-stamp"></span>
+    </h2>
+    <iframe id="canvas-frame" title="agent-canvas" style="display:none"></iframe>
+    <div id="canvas-empty" class="empty">Agent 还没开始工作。<br>输入旅行需求并点击「运行」，此处将实时展示交互问卷、思考状态和最终行程单。</div>
+  </div>
+  <div class="col right">
+    <div class="box detail-box">
+      <h2>节点详情 / 历史<span class="sub" id="detail-id"></span></h2>
+      <div id="detail"><div class="empty">点击左侧任一节点，查看其需求、评价指标与尝试历史。</div></div>
+    </div>
+    <div class="box feed-box">
+      <h2>执行过程 (Activity)</h2>
+      <div id="feed" class="feed"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const treeEl = $("#tree"), feedEl = $("#feed"), statusEl = $("#status");
+const reqEl = $("#req"), runBtn = $("#run");
+const canvasStatusBadge = $("#canvas-status");
+const detailEl = $("#detail"), detailIdEl = $("#detail-id");
+const canvasFrame = $("#canvas-frame"), canvasTitle = $("#canvas-title"),
+      canvasStamp = $("#canvas-stamp"), canvasEmpty = $("#canvas-empty");
+let snapshot = null;
+let currentUiReq = null;   // 当前 iframe 对应的 request_id
+let selectedId = null;     // 节点详情面板选中的节点
+let hasCanvasContent = false;
+let lastLogMessage = "正在规划您的旅行需求...";
+
+const STATUS_LABEL = { pending: "待办", active: "进行中", done: "完成", blocked: "受阻", abandoned: "放弃" };
+const DOT = { pending: "○", active: "◉", done: "●", blocked: "▲", abandoned: "✕" };
+
+function connect() {
+  const ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onmessage = (e) => handle(JSON.parse(e.data));
+  ws.onclose = () => { setStatus("idle"); setTimeout(connect, 1500); };
+  window._ws = ws;
+}
+
+function send(action, extra) { window._ws?.send(JSON.stringify({ action, ...extra })); }
+
+function setStatus(state) {
+  const running = state === "running";
+  statusEl.textContent = running ? "运行中…" : "空闲";
+  statusEl.className = "pill" + (running ? " running" : "");
+  runBtn.disabled = running;
+}
+
+// ---- Canvas Status Banner & Helper ----
+function updateCanvasStatus(state) {
+  canvasStatusBadge.className = "status-badge " + state;
+  const labels = {
+    idle: "已就绪",
+    thinking: "思考中",
+    executing: "执行中",
+    interacting: "需反馈",
+    completed: "规划完成"
+  };
+  canvasStatusBadge.textContent = labels[state] || "已就绪";
+}
+
+function getActiveNodeTitle() {
+  if (snapshot && snapshot.focused_id && snapshot.nodes[snapshot.focused_id]) {
+    return snapshot.nodes[snapshot.focused_id].title;
+  }
+  return null;
+}
+
+function isAllDone(rootId) {
+  if (!snapshot || !snapshot.nodes) return false;
+  const root = snapshot.nodes[rootId];
+  if (!root) return false;
+  return root.status === "done";
+}
+
+// ---- Dynamic Canvas Iframe state renderer ----
+function renderIframeState(state, info) {
+  let html = "";
+  if (state === "idle") {
+    html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body {
+            margin: 0; background: #0d1117; color: #e6edf3;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 90vh; text-align: center; box-sizing: border-box; padding: 20px;
+          }
+          .icon {
+            font-size: 54px; margin-bottom: 16px;
+            animation: float 4s ease-in-out infinite;
+          }
+          h3 { font-size: 18px; font-weight: 600; margin: 0 0 10px; color: #58a6ff; }
+          p { font-size: 13.5px; color: #8b949e; max-width: 380px; line-height: 1.6; margin: 0; }
+          @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
+            100% { transform: translateY(0px); }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="icon">🤖</div>
+        <h3>旅行规划 AI 助手就绪</h3>
+        <p>输入您的旅行需求并点击「运行」，我将在此处实时构建您的定制行程单并协助您进行决策。</p>
+      </body>
+      </html>
+    `;
+  } else if (state === "thinking" || state === "executing") {
+    const titleText = state === "thinking" ? "Agent 正在思考中..." : "Agent 正在执行任务...";
+    const focusNodeText = info && info.nodeTitle ? `当前聚焦目标: <b>${info.nodeTitle}</b>` : "正在分析目标树规划...";
+    const detailText = info && info.lastLog ? info.lastLog : "正在推进规划决策...";
+    html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body {
+            margin: 0; background: #0d1117; color: #e6edf3;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 90vh; text-align: center; box-sizing: border-box; padding: 20px;
+            overflow: hidden;
+          }
+          .hud-container {
+            position: relative; width: 100px; height: 100px; margin-bottom: 24px;
+          }
+          .circle {
+            position: absolute; border: 2px solid transparent; border-radius: 50%;
+            animation: spin 3s linear infinite;
+          }
+          .c1 {
+            width: 100px; height: 100px;
+            border-top-color: #58a6ff; border-bottom-color: #58a6ff;
+            animation-duration: 2s;
+          }
+          .c2 {
+            top: 12px; left: 12px; width: 76px; height: 76px;
+            border-left-color: #bc8cff; border-right-color: #bc8cff;
+            animation-direction: reverse; animation-duration: 1.5s;
+          }
+          .c3 {
+            top: 24px; left: 24px; width: 48px; height: 48px;
+            border-top-color: #3fb950; border-bottom-color: #3fb950;
+            animation-duration: 1s;
+          }
+          .logo {
+            position: absolute; top: 32px; left: 32px; width: 36px; height: 36px;
+            background: #1f2937; border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; font-size: 16px;
+            animation: pulse 1.5s ease-in-out infinite;
+          }
+          h3 { font-size: 16px; font-weight: 600; margin: 0 0 8px; color: #58a6ff; letter-spacing: 0.5px; }
+          .node { font-size: 13px; color: #e6edf3; margin-bottom: 12px; }
+          .log {
+            font-size: 11.5px; color: #8b949e; font-family: ui-monospace, monospace;
+            background: #161b22; padding: 8px 14px; border-radius: 8px;
+            border: 1px solid #21262d; max-width: 440px; width: 90%;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            animation: blink 2s infinite;
+          }
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+          @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(88,166,255,0.4); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 8px rgba(88,166,255,0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(88,166,255,0); }
+          }
+          @keyframes blink {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 0.5; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="hud-container">
+          <div class="circle c1"></div>
+          <div class="circle c2"></div>
+          <div class="circle c3"></div>
+          <div class="logo">⚡</div>
+        </div>
+        <h3>${titleText}</h3>
+        <div class="node">${focusNodeText}</div>
+        <div class="log">${detailText}</div>
+      </body>
+      </html>
+    `;
+  } else if (state === "submitting") {
+    html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body {
+            margin: 0; background: #0d1117; color: #e6edf3;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 90vh; text-align: center; box-sizing: border-box; padding: 20px;
+          }
+          .loader {
+            width: 44px; height: 44px; border: 3px solid #21262d; border-radius: 50%;
+            border-top-color: #3fb950; animation: spin 1s linear infinite; margin-bottom: 16px;
+          }
+          h3 { font-size: 16px; font-weight: 600; margin: 0 0 8px; color: #3fb950; }
+          p { font-size: 13px; color: #8b949e; }
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="loader"></div>
+        <h3>需求表提交成功</h3>
+        <p>正在回传数据至 Agent，系统将继续进行规划...</p>
+      </body>
+      </html>
+    `;
+  }
+  
+  canvasEmpty.style.display = "none";
+  canvasFrame.style.display = "block";
+  canvasFrame.removeAttribute("src");
+  canvasFrame.srcdoc = html;
+}
+
+function handle(ev) {
+  if (ev.type === "tree") {
+    snapshot = ev.snapshot;
+    snapshot.focused_id = ev.focused_id;
+    renderTree();
+    
+    // 如果正在运行且处于思考阶段，实时更新思考界面的目标
+    if (window._agentRunning && !hasCanvasContent && !currentUiReq) {
+      updateCanvasStatus("thinking");
+      renderIframeState("thinking", { nodeTitle: getActiveNodeTitle(), lastLog: lastLogMessage });
+    }
+  }
+  else if (ev.type === "message") addMessage(ev);
+  else if (ev.type === "log") {
+    addLog(ev.text);
+    lastLogMessage = ev.text;
+    
+    // 如果正在运行且处于思考阶段，实时更新思考界面的日志
+    if (window._agentRunning && !hasCanvasContent && !currentUiReq) {
+      renderIframeState("thinking", { nodeTitle: getActiveNodeTitle(), lastLog: lastLogMessage });
+    }
+  }
+  else if (ev.type === "ui_render") openUi(ev);
+  else if (ev.type === "ui_close") closeUi(ev.request_id);
+  else if (ev.type === "ui_canvas") updateCanvas(ev);
+  else if (ev.type === "status") {
+    setStatus(ev.state);
+    if (ev.state === "running") {
+      window._agentRunning = true;
+      hasCanvasContent = false; // 重新运行重置 canvas
+      updateCanvasStatus("thinking");
+      if (ev.requirement) {
+        feedEl.innerHTML = "";
+        addLog("▶ 需求：" + ev.requirement);
+      }
+      if (!currentUiReq) {
+        renderIframeState("thinking", { nodeTitle: getActiveNodeTitle(), lastLog: lastLogMessage });
+      }
+    } else {
+      window._agentRunning = false;
+      if (snapshot && snapshot.root_id && isAllDone(snapshot.root_id)) {
+        updateCanvasStatus("completed");
+      } else {
+        updateCanvasStatus("idle");
+      }
+      if (!hasCanvasContent && !currentUiReq) {
+        renderIframeState("idle");
+      }
+    }
+  }
+}
+
+// ---- 常驻 Agent 画布（非阻塞，自动刷新）----
+function updateCanvas(ev) {
+  hasCanvasContent = true;
+  canvasEmpty.style.display = "none";
+  canvasFrame.style.display = "block";
+  canvasTitle.textContent = ev.title ? " · " + ev.title : "";
+  if (ev.url) {
+    canvasFrame.removeAttribute("srcdoc");
+    canvasFrame.src = ev.url + (ev.url.includes("?") ? "&" : "?") + "_t=" + Date.now();  // 缓存击穿，强制刷新
+  } else {
+    canvasFrame.removeAttribute("src");
+    canvasFrame.srcdoc = ev.html || "";
+  }
+  canvasStamp.textContent = "已自动刷新 " + new Date().toLocaleTimeString();
+  canvasFrame.classList.add("pulse");
+  setTimeout(() => canvasFrame.classList.remove("pulse"), 450);
+  addLog("🖼 Agent 更新了画布：" + (ev.title || ""));
+  
+  if (window._agentRunning) {
+    updateCanvasStatus("executing");
+  }
+}
+
+// ---- Agent 渲染的 iframe 交互界面 ----
+function openUi(ev) {
+  currentUiReq = ev.request_id;
+  updateCanvasStatus("interacting");
+  canvasEmpty.style.display = "none";
+  canvasFrame.style.display = "block";
+  canvasTitle.textContent = ev.title ? " · " + ev.title : "";
+  if (ev.url) {
+    canvasFrame.removeAttribute("srcdoc");
+    canvasFrame.src = ev.url;
+  } else {
+    canvasFrame.removeAttribute("src");
+    canvasFrame.srcdoc = ev.html || "<p>（空界面）</p>";
+  }
+  canvasStamp.textContent = "等待你提交...";
+  addLog("🪟 Agent 渲染了交互界面：" + (ev.title || "") + (ev.await_result ? "（等待你提交…）" : ""));
+}
+
+function closeUi(reqId) {
+  if (reqId && reqId !== currentUiReq) return;
+  currentUiReq = null;
+  if (window._agentRunning) {
+    updateCanvasStatus("executing");
+    renderIframeState("thinking", { nodeTitle: getActiveNodeTitle(), lastLog: lastLogMessage });
+  } else {
+    if (snapshot && snapshot.root_id && isAllDone(snapshot.root_id)) {
+      updateCanvasStatus("completed");
+    } else {
+      updateCanvasStatus("idle");
+    }
+    if (!hasCanvasContent) {
+      renderIframeState("idle");
+    }
+  }
+}
+
+// 监听 iframe 内表单通过 postMessage 回传的结构化数据，转发给后端唤醒 Agent
+window.addEventListener("message", (e) => {
+  const d = e.data;
+  if (!d || typeof d !== "object") return;
+  const isSubmit =
+    (typeof d.type === "string" && (d.type === "trip-req-eval:submit" || d.type.endsWith(":submit")));
+  if (!isSubmit || !currentUiReq) return;
+  const payload = d.payload !== undefined ? d.payload : d;
+  send("ui_result", { request_id: currentUiReq, payload });
+  addLog("📤 已提交需求表，回传给 Agent。");
+  
+  // 提交后，立即展示过渡动态页面并转回执行状态
+  renderIframeState("submitting");
+  updateCanvasStatus("executing");
+  currentUiReq = null;
+});
+
+function renderTree() {
+  if (!snapshot || !snapshot.root_id) return;
+  treeEl.innerHTML = "";
+  treeEl.appendChild(renderNode(snapshot.root_id));
+  renderDetail();
+}
+
+function renderNode(id) {
+  const n = snapshot.nodes[id];
+  const wrap = document.createElement("div");
+  wrap.className = "node st-" + n.status;
+
+  const row = document.createElement("div");
+  row.className = "node-row" + (id === selectedId ? " sel" : "");
+  row.onclick = (e) => { e.stopPropagation(); selectedId = id; renderTree(); };
+  const focused = id === snapshot.focused_id;
+
+  const summary = n.summary
+    ? `<div class="summary">📝 ${escapeHtml(n.summary)}</div>` : "";
+  const lastMsg = (!n.summary && n.last_msg)
+    ? `<div class="summary">💬 ${escapeHtml(n.last_msg)}</div>` : "";
+
+  // 评价 / 历史 chips
+  const chips = [];
+  if (n.requires_user_input)
+    chips.push(n.user_submitted
+      ? `<span class="chip pass">✅ 已采集用户输入</span>`
+      : `<span class="chip fail">⛔ 待用户提交</span>`);
+  if (n.metrics && n.metrics.length)
+    chips.push(`<span class="chip metric">指标×${n.metrics.length} · ≥${n.pass_threshold}</span>`);
+  if (n.current_eval) {
+    const ev = n.current_eval;
+    chips.push(`<span class="chip ${ev.passed ? "pass" : "fail"}">评分 ${ev.overall}${ev.passed ? " ✓" : " ✗"}</span>`);
+  }
+  const tries = (n.attempts ? n.attempts.length : 0);
+  if (tries >= 1 || n.attempt_no > 1)
+    chips.push(`<span class="chip try">第${n.attempt_no}次 · 历史${tries}</span>`);
+  const chipsHtml = chips.length ? `<div class="chips">${chips.join("")}</div>` : "";
+
+  row.innerHTML = `
+    <span class="dotmark">${DOT[n.status]}</span>
+    <span class="id">${n.id}</span>
+    <div class="title">
+      <div>${escapeHtml(n.title)} ${focused ? '<span class="focus-tag">焦点</span>' : ""}</div>
+      ${summary}${lastMsg}${chipsHtml}
+    </div>
+    <span class="badge">${STATUS_LABEL[n.status]}${n.msg_count ? " · " + n.msg_count + "msg" : ""}</span>
+  `;
+  wrap.appendChild(row);
+
+  if (n.children && n.children.length) {
+    const kids = document.createElement("div");
+    kids.className = "children";
+    n.children.forEach((cid) => kids.appendChild(renderNode(cid)));
+    wrap.appendChild(kids);
+  }
+  return wrap;
+}
+
+function renderDetail() {
+  const id = selectedId || (snapshot && snapshot.focused_id);
+  if (!snapshot || !id || !snapshot.nodes[id]) return;
+  const n = snapshot.nodes[id];
+  detailIdEl.textContent = " [" + n.id + "] " + n.title;
+
+  let html = "";
+  if (n.requirements && n.requirements.length) {
+    html += `<div class="d-sec"><h3>硬性需求</h3>` +
+      n.requirements.map((r) => `<div class="req-li">• ${escapeHtml(r)}</div>`).join("") + `</div>`;
+  }
+  if (n.metrics && n.metrics.length) {
+    const ev = n.current_eval;
+    const scoreOf = (m) => {
+      if (!ev || !ev.scores) return "";
+      const s = ev.scores.find((x) => (x.key || x.name) === (m.key || m.name));
+      if (!s) return "";
+      return `<span class="verdict ${s.verdict}">${s.score}·${s.verdict}</span>`;
+    };
+    html += `<div class="d-sec"><h3>评价指标（及格线 overall ≥ ${n.pass_threshold}）</h3>
+      <table class="metrics"><tr><th>指标</th><th>层</th><th>判定</th><th>通过标准</th><th>本轮</th></tr>` +
+      n.metrics.map((m) => `<tr>
+        <td>${escapeHtml(m.name || m.key || "")}</td>
+        <td><span class="layer">${escapeHtml(m.layer || "?")}</span></td>
+        <td>${escapeHtml(m.judge_method || "")}</td>
+        <td>${escapeHtml(m.pass_criteria || "")}</td>
+        <td>${scoreOf(m)}</td></tr>`).join("") + `</table></div>`;
+    if (ev) {
+      html += `<div class="d-sec"><h3>独立评审结果</h3>
+        <div class="req-li">评审方：<code>${escapeHtml(ev.judged_by || "独立模型")}</code>（非本 agent 自评）</div>
+        <div class="req-li">overall = <b class="${ev.passed ? "verdict pass" : "verdict fail"}">${ev.overall}</b> / 阈值 ${ev.threshold} → ${ev.passed ? "✅ 通过" : "❌ 未通过"}</div>
+        ${ev.notes ? `<div class="req-li" style="color:var(--muted)">评审意见：${escapeHtml(ev.notes)}</div>` : ""}</div>`;
+    }
+  }
+
+  // 尝试历史时间线（含已归档 + 当前进行中）
+  const atts = (n.attempts || []).slice();
+  const timeline = atts.map((a) => attRow(a, false));
+  if (n.current_eval && n.status !== "done") {
+    timeline.push(attRow({
+      n: n.current_eval.attempt_no, outcome: n.current_eval.passed ? "passed" : "failed",
+      overall: n.current_eval.overall, threshold: n.current_eval.threshold,
+      failed: n.current_eval.failed, reason: n.current_eval.notes, summary: ""
+    }, true));
+  }
+  if (timeline.length) {
+    html += `<div class="d-sec"><h3>尝试历史（评分轨迹）</h3><div class="timeline">${timeline.join("")}</div></div>`;
+  }
+  if (n.summary && n.status === "done")
+    html += `<div class="d-sec"><h3>最终摘要</h3><div class="req-li">${escapeHtml(n.summary)}</div></div>`;
+  if (!html) html = `<div class="empty">该节点尚未设定评价指标 / 历史。</div>`;
+  detailEl.innerHTML = html;
+}
+
+function attRow(a, current) {
+  const sc = (a.overall != null)
+    ? `<span class="score ${a.outcome === "passed" ? "pass" : "fail"}">${a.overall}</span> / ${a.threshold ?? ""}` : "—";
+  const failed = (a.failed && a.failed.length) ? ` · 未过：${a.failed.map(escapeHtml).join(", ")}` : "";
+  const reason = a.reason ? `<div class="reason">${escapeHtml(a.reason)}</div>` : "";
+  const label = { passed: "通过", failed: "未通过", replanned: "重规划" }[a.outcome] || a.outcome;
+  return `<div class="att ${a.outcome}${current ? " current" : ""}">
+    <span class="n">#${a.n}</span>
+    <div class="body"><div>${label} · ${sc}${failed}${current ? " · 进行中" : ""}</div>${reason}</div>
+  </div>`;
+}
+
+function addMessage(ev) {
+  const div = document.createElement("div");
+  const isTool = ev.kind === "tool_use";
+  div.className = "ev " + (isTool ? "tool" : "text");
+  div.innerHTML = `
+    <div class="meta"><span class="nid">[${ev.node_id || "?"}]</span><span>${isTool ? "工具调用" : "Agent"}</span></div>
+    <div class="text">${escapeHtml(ev.text)}</div>`;
+  feedEl.appendChild(div);
+  scrollFeed();
+}
+
+function addLog(text) {
+  const div = document.createElement("div");
+  div.className = "ev log";
+  div.innerHTML = `<div class="text">${escapeHtml(text)}</div>`;
+  feedEl.appendChild(div);
+  scrollFeed();
+}
+
+function scrollFeed() {
+  const c = feedEl.parentElement;
+  c.scrollTop = c.scrollHeight;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+runBtn.onclick = () => {
+  const req = reqEl.value.trim();
+  if (req) send("run", { requirement: req });
+};
+reqEl.addEventListener("keydown", (e) => { if (e.key === "Enter") runBtn.click(); });
+treeEl.addEventListener("click", (e) => {
+  if (e.target.dataset.s) { reqEl.value = e.target.dataset.s; reqEl.focus(); }
+});
+
+connect();
+renderIframeState("idle");
+</script>
+</body>
+</html>
